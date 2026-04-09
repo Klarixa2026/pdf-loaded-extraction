@@ -1,0 +1,6 @@
+{
+  "functions": {
+    "app/api/extract/route.js": { "maxDuration": 60 },
+    "app/api/download/route.js": { "maxDuration": 30 }
+  }
+}
