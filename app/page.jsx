@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tiny shared components
@@ -45,58 +45,104 @@ function StepBadge({ current, total, label }) {
 }
 
 function ExtractionLoader({ fileName }) {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    const t = setInterval(() => setElapsed((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const isLong = elapsed >= 20;
+  const isVeryLong = elapsed >= 40;
+
   const steps = [
-    { label: 'Reading PDF document', detail: 'Parsing text layer from all pages' },
-    { label: 'Identifying test sections', detail: 'Locating requested section headers' },
-    { label: 'Extracting test steps', detail: 'Parsing rows, columns and step data' },
-    { label: 'Generating step titles', detail: 'Summarising procedures with Klarixa AI' },
+    { label: 'Reading PDF document',    detail: 'Parsing text layer from all pages',           doneAt: 3  },
+    { label: 'Identifying test sections', detail: 'Locating requested section headers',        doneAt: 7  },
+    { label: 'Extracting test steps',   detail: 'Parsing rows, columns and step data',         doneAt: 20 },
+    { label: 'Generating step titles',  detail: 'Summarising procedures with Klarixa AI',      doneAt: 40 },
   ];
 
   return (
-    <div className="flex flex-col items-center justify-center py-20 px-6">
+    <div className="flex flex-col items-center justify-center py-16 px-6">
       {/* Animated ring */}
       <div className="relative w-20 h-20 mb-8">
         <svg className="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
           <circle cx="40" cy="40" r="34" fill="none" stroke="#e5e7eb" strokeWidth="6" />
           <circle
             cx="40" cy="40" r="34" fill="none"
-            stroke="#1d4ed8" strokeWidth="6"
+            stroke={isVeryLong ? '#d97706' : '#1d4ed8'} strokeWidth="6"
             strokeDasharray="213.6"
             strokeDashoffset="53"
             strokeLinecap="round"
-            style={{ animation: 'spin 1.4s linear infinite' }}
+            style={{ animation: 'spin 1.4s linear infinite', transition: 'stroke 0.5s' }}
           />
         </svg>
-        {/* Klarixa "K" mark in center */}
         <div className="absolute inset-0 flex items-center justify-center">
           <span className="text-lg font-black text-blue-700 select-none">K</span>
         </div>
       </div>
 
-      <p className="text-lg font-semibold text-gray-900 mb-1">Analysing document</p>
+      <p className="text-lg font-semibold text-gray-900 mb-0.5">Analysing document</p>
       {fileName && (
-        <p className="text-sm text-gray-500 mb-8 max-w-xs truncate text-center">{fileName}</p>
+        <p className="text-sm text-gray-400 mb-1 max-w-xs truncate text-center">{fileName}</p>
       )}
+      <p className="text-xs text-gray-400 mb-8 tabular-nums">{elapsed}s elapsed</p>
 
       {/* Step list */}
-      <div className="w-full max-w-sm space-y-3">
-        {steps.map((s, i) => (
-          <div key={i} className="flex items-start gap-3">
-            <div className="mt-0.5 w-5 h-5 flex-shrink-0 flex items-center justify-center">
-              <div
-                className="w-2 h-2 rounded-full bg-blue-600"
-                style={{ animation: `pulse 1.6s ease-in-out ${i * 0.3}s infinite` }}
-              />
+      <div className="w-full max-w-sm space-y-3 mb-8">
+        {steps.map((s, i) => {
+          const done = elapsed >= s.doneAt;
+          const active = !done && (i === 0 || elapsed >= steps[i - 1].doneAt);
+          return (
+            <div key={i} className="flex items-start gap-3">
+              <div className="mt-0.5 w-5 h-5 flex-shrink-0 flex items-center justify-center">
+                {done ? (
+                  <svg className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  <div
+                    className={`w-2 h-2 rounded-full ${active ? 'bg-blue-600' : 'bg-gray-300'}`}
+                    style={active ? { animation: 'pulse 1.6s ease-in-out infinite' } : {}}
+                  />
+                )}
+              </div>
+              <div>
+                <p className={`text-sm font-medium ${done ? 'text-gray-400 line-through' : active ? 'text-gray-900' : 'text-gray-400'}`}>
+                  {s.label}
+                </p>
+                {active && <p className="text-xs text-gray-400">{s.detail}</p>}
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-medium text-gray-800">{s.label}</p>
-              <p className="text-xs text-gray-400">{s.detail}</p>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      <p className="mt-10 text-xs text-gray-400">This usually takes 15 – 30 seconds</p>
+      {/* Progressive status messages */}
+      {!isLong && (
+        <p className="text-xs text-gray-400">This usually takes 15 – 30 seconds</p>
+      )}
+
+      {isLong && !isVeryLong && (
+        <div className="w-full max-w-sm bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+          <p className="font-semibold mb-0.5">Taking longer than usual</p>
+          <p className="text-xs text-amber-700 leading-relaxed">
+            The document likely has a large number of test steps or multiple subsections.
+            Klarixa AI is still working — hang tight.
+          </p>
+        </div>
+      )}
+
+      {isVeryLong && (
+        <div className="w-full max-w-sm bg-orange-50 border border-orange-300 rounded-xl px-4 py-3 text-sm text-orange-900">
+          <p className="font-semibold mb-1">This is taking a while</p>
+          <ul className="text-xs text-orange-800 space-y-1 leading-relaxed list-disc list-inside">
+            <li>Large sections with 30+ steps take 40 – 55 seconds</li>
+            <li>Try narrowing to a specific subsection (e.g. "5.1, 5.2") to speed it up</li>
+            <li>If it fails, re-upload and use a more specific section name</li>
+          </ul>
+        </div>
+      )}
 
       <style>{`
         @keyframes spin { to { stroke-dashoffset: -213.6; } }
@@ -636,19 +682,15 @@ export default function Home() {
       const res = await fetch('/api/extract', { method: 'POST', body: formData });
       const contentType = res.headers.get('content-type') ?? '';
       if (!contentType.includes('application/json')) {
-        // Netlify / gateway returned an HTML error page (e.g. timeout)
-        throw new Error(
-          res.status === 504 || res.status === 502
-            ? 'The extraction timed out. Try a smaller section (e.g. "5.1" instead of "Section 5") and re-upload.'
-            : `Server error (${res.status}). Check that OPENAI_API_KEY is set in Netlify environment variables.`
-        );
+        const isTimeout = res.status === 504 || res.status === 502 || res.status === 524;
+        throw Object.assign(new Error('timeout'), { isTimeout });
       }
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? 'Extraction failed');
       setExtractedData(json);
       setStage('mapping');
     } catch (err) {
-      setError(err.message);
+      setError(err.isTimeout ? 'timeout' : err.message);
       setStage('upload');
       setUploadedFileName(null);
     }
@@ -697,7 +739,45 @@ export default function Home() {
       </header>
 
       <div className="max-w-4xl mx-auto px-6 py-8">
-        {error && (
+        {error === 'timeout' && (
+          <div className="mb-6 bg-white border border-orange-200 rounded-2xl p-6 shadow-sm">
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
+                <svg className="w-5 h-5 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-gray-900 mb-1">Extraction timed out</p>
+                <p className="text-sm text-gray-600 mb-4">
+                  The document had too much content to process within the time limit.
+                  This usually happens with large sections containing many subsections or 30+ test steps.
+                </p>
+                <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Try one of these:</p>
+                <ul className="space-y-2 mb-5">
+                  {[
+                    { tip: 'Narrow the section', detail: 'Instead of "Section 5 (all)", try "5.1, 5.2" or a single subsection' },
+                    { tip: 'Be more specific', detail: 'e.g. "5.1 Media connections" targets just that subsection' },
+                    { tip: 'Split into batches', detail: 'Extract 5.1–5.3 first, download, then extract 5.4–5.6 separately' },
+                  ].map(({ tip, detail }) => (
+                    <li key={tip} className="flex items-start gap-2 text-sm">
+                      <span className="mt-0.5 w-4 h-4 flex-shrink-0 rounded-full bg-blue-100 text-blue-700 text-xs flex items-center justify-center font-bold">→</span>
+                      <span><span className="font-medium text-gray-800">{tip}:</span> <span className="text-gray-500">{detail}</span></span>
+                    </li>
+                  ))}
+                </ul>
+                <button
+                  onClick={() => setError(null)}
+                  className="text-sm font-semibold text-white bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg transition-colors"
+                >
+                  Try again
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {error && error !== 'timeout' && (
           <div className="mb-6">
             <ErrorBanner message={error} onDismiss={() => setError(null)} />
           </div>
