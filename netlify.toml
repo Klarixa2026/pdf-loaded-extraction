@@ -11,7 +11,8 @@
 # Increase function timeout for the AI extraction route (Netlify Pro+)
 # Free tier is capped at 10 s — upgrade if you hit timeouts on large PDFs
 [functions]
-  node_bundler = "esbuild"
+  node_bundler    = "esbuild"
+  timeout_seconds = 26
 
 [[headers]]
   for = "/*"

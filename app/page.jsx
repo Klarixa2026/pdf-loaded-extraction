@@ -634,6 +634,15 @@ export default function Home() {
 
     try {
       const res = await fetch('/api/extract', { method: 'POST', body: formData });
+      const contentType = res.headers.get('content-type') ?? '';
+      if (!contentType.includes('application/json')) {
+        // Netlify / gateway returned an HTML error page (e.g. timeout)
+        throw new Error(
+          res.status === 504 || res.status === 502
+            ? 'The extraction timed out. Try a smaller section (e.g. "5.1" instead of "Section 5") and re-upload.'
+            : `Server error (${res.status}). Check that OPENAI_API_KEY is set in Netlify environment variables.`
+        );
+      }
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? 'Extraction failed');
       setExtractedData(json);
